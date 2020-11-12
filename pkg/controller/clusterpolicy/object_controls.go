@@ -459,6 +459,12 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 			obj.Spec.Template.Spec.Containers[i].Resources = *config.DevicePlugin.Resources
 		}
 	}
+
+	var migStrategy gpuv1.MigStrategy = config.GroupFeatureDiscovery.MigStrategy
+	if migStrategy != "" {
+		addContainerArg(&(obj.Spec.Template.Spec.Containers[0]), "-mig-strategy")
+		addContainerArg(&(obj.Spec.Template.Spec.Containers[0]), fmt.Sprintf("%s", migStrategy))
+	}
 	return nil
 }
 
@@ -550,6 +556,11 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 
 	log.Info(fmt.Sprintf("Info: Could not find environment variable %s in container %s, appending it", key, c.Name))
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
+}
+
+func addContainerArg(c *corev1.Container, val string) {
+	c.Args = append(c.Args, val)
+	log.Info(fmt.Sprintf("Info: adding Pod argument '%s'", val))
 }
 
 // TransformValidator transforms driver and device plugin validator pods with required config as per ClusterPolicy
