@@ -31,7 +31,7 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -53,7 +53,7 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -75,7 +75,7 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -97,7 +97,7 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -119,7 +119,7 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -141,7 +141,7 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -633,7 +633,7 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return isDeploymentReady(obj.Name, n), nil
 		}
 
@@ -657,7 +657,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return isDaemonSetReady(obj.Name, n), nil
 		}
 
@@ -709,7 +709,7 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return isPodReady(obj.Name, n, "Succeeded"), nil
 		}
 
@@ -750,7 +750,7 @@ func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) 
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -772,7 +772,7 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 
@@ -794,7 +794,7 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			logger.Info("Found Resource")
+			//logger.Info("Found Resource")
 			return gpuv1.Ready, nil
 		}
 

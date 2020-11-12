@@ -81,7 +81,7 @@ func addResourcesControls(path, openshiftVersion string) (Resources, controlFunc
 	res := Resources{}
 	ctrl := controlFunc{}
 
-	log.Info("Getting assets from: ", "path:", path)
+	//log.Info("Getting assets from: ", "path:", path)
 	manifests := getAssetsFrom(path, openshiftVersion)
 
 	s := json.NewYAMLSerializer(json.DefaultMetaFactory, scheme.Scheme,
@@ -93,7 +93,7 @@ func addResourcesControls(path, openshiftVersion string) (Resources, controlFunc
 		slce := strings.Split(kind, ":")
 		kind = strings.TrimSpace(slce[1])
 
-		log.Info("DEBUG: Looking for ", "Kind", kind, "in path:", path)
+		//log.Info("DEBUG: Looking for ", "Kind", kind, "in path:", path)
 
 		switch kind {
 		case "ServiceAccount":
