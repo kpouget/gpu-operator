@@ -108,6 +108,10 @@ type ComponentSpec struct {
 
 	// Optional: Resources
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Optional: MigMode for GPU partitioning
+	// +kubebuilder:validation:Optional
+	MigMode string `json:"migMode,omitempty"`
 }
 
 // GPUFeatureDiscoverySpec defines the properties for GPU Feature Discovery Plugin

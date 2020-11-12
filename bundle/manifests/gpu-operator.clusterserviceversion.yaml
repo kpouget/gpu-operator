@@ -46,6 +46,7 @@ metadata:
               "securityContext": {},
               "tolerations": [],
               "version": "450.80.02"
+              "migMode": "19,19,19,19",
             },
             "gfd": {
               "affinity": {},

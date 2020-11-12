@@ -21,6 +21,7 @@ spec:
     podSecurityContext: {}
     securityContext: {}
     resources: {}
+    migMode: 19,19,19,19
   toolkit:
     repository: nvcr.io/nvidia/k8s
     version: 1.3.0-ubi8

@@ -2265,6 +2265,9 @@ spec:
                 version:
                   pattern: '[a-zA-Z0-9\.-]+'
                   type: string
+                migMode:
+                  description: 'Optional: MigMode for GPU partitioning'
+                  type: string
               required:
               - image
               - repository
