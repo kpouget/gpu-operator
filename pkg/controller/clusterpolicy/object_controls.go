@@ -215,6 +215,7 @@ func getDcgmExporter() string {
 func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 	transformations := map[string]func(*appsv1.DaemonSet, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-daemonset":            TransformDriver,
+		"nvidia-mig-mode-daemonset":          TransformMigMode,
 		"nvidia-container-toolkit-daemonset": TransformToolkit,
 		"nvidia-device-plugin-daemonset":     TransformDevicePlugin,
 		"nvidia-dcgm-exporter":               TransformDCGMExporter,
@@ -379,6 +380,21 @@ func TransformDriver(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n C
 
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, rhelVersion)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, ocpVersion)
+
+	return nil
+}
+
+// TransformMigMode transforms Nvidia mig-mode daemonset with required config as per ClusterPolicy
+func TransformMigMode(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	if err := TransformDriver(obj, config, n); err != nil {
+		return err
+	}
+
+	migStrategy := corev1.EnvVar{Name: "DRV_MIG_STRATEGY", Value: "mixed"}
+	migMode := corev1.EnvVar{Name: "DRV_MIG_MODE", Value: "19,19,19,19"}
+
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, migStrategy)
+	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, migMode)
 
 	return nil
 }
