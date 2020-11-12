@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -563,6 +564,59 @@ func addContainerArg(c *corev1.Container, val string) {
 	log.Info(fmt.Sprintf("Info: adding Pod argument '%s'", val))
 }
 
+func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+	if err := TransformValidator(obj, config, n); err != nil {
+		return err
+	}
+
+	if config.GroupFeatureDiscovery.MigStrategy != "mixed" {
+		return nil
+	}
+
+	opts := []client.ListOption{
+		client.MatchingLabels{"nvidia.com/gpu.present": "true"},
+	}
+	log.Info("DEBUG: Node", "NodeSelector", "nvidia.com/gpu.present=true")
+	list := &corev1.NodeList{}
+	err := n.rec.client.List(context.TODO(), list, opts...)
+
+	if err != nil {
+		log.Info("Could not get NodeList", err)
+	}
+	log.Info("DEBUG: Node", "NumberOfNodes", len(list.Items))
+	if len(list.Items) == 0 {
+		return fmt.Errorf("ERROR: Could not find any node with label 'nvidia.com/gpu.present=true'")
+	}
+
+	node := list.Items[0]
+	log.Info("DEBUG: Node", "NodeName", node.ObjectMeta.Name)
+
+	var mig_resource_name corev1.ResourceName = ""
+
+	for resource_name, quantity := range node.Status.Capacity {
+		if quantity.Value() < 1 || ! strings.HasPrefix(string(resource_name), "nvidia.com/mig-") {
+			continue
+		}
+
+		mig_resource_name = resource_name
+		break
+	}
+
+	if mig_resource_name == "" {
+		return fmt.Errorf("ERROR: Could not find any 'nvidia.com/mig-*' resource in node/%s",
+			              node.ObjectMeta.Name)
+	}
+
+	mig_resource := corev1.ResourceList{
+		mig_resource_name: resource.MustParse("1"),
+	}
+
+	obj.Spec.Containers[0].Resources.Limits = mig_resource
+	obj.Spec.Containers[0].Resources.Requests = mig_resource
+
+	return nil
+}
+
 // TransformValidator transforms driver and device plugin validator pods with required config as per ClusterPolicy
 func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	// update image
@@ -734,7 +788,7 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
 	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-validation":        TransformValidator,
-		"nvidia-device-plugin-validation": TransformValidator,
+		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
 	}
 
 	t, ok := transformations[obj.Name]
