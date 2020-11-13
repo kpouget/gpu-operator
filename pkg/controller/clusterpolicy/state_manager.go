@@ -173,6 +173,17 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	if i.Spec.Operator.DeployGFD {
 		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
 	}
+
+	if n.singleton.Status.StateRollback >= len(n.controls) - 1 {
+		log.Info("-------------- ROLLBACK FINISHED :)")
+		n.singleton.Status.StateRollback = -1
+		i.Status.StateRollback = -1
+	} else if n.singleton.Status.StateRollback != -1 {
+		log.Info("-------------- ROLLBACK _NOT_ FINISHED",
+			"current", n.singleton.Status.StateRollback,
+			"total", len(n.controls))
+	}
+
 	return nil
 }
 

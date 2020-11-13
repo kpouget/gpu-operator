@@ -191,6 +191,17 @@ const (
 type ClusterPolicyStatus struct {
 	// +kubebuilder:validation:Enum=ignored;ready;notReady
 	State State `json:"state"`
+
+	// Optional: Index of state currently rolled back
+	StateRollback int `json:"stateRollBack,omitempty"`
+
+	// Optional: MigStrategy for GPU feature discovery plugin
+	// +kubebuilder:validation:Enum=none;single;mixed
+	MigStrategy MigStrategy `json:"migStrategy,omitempty"`
+
+	// Optional: MigMode for GPU partitioning
+	// +kubebuilder:validation:Optional
+	MigMode string `json:"migMode,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

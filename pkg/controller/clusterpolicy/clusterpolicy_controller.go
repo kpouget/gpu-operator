@@ -119,8 +119,12 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 			log.Error(err, "Failed to get ClusterPolicy instance for status update")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, err
 		}
-		if instance.Status.State != status {
-			instance.Status.State = status
+		statusUpdated := func() bool {
+			return instance.Status.State != ctrl.singleton.Status.State || instance.Status.StateRollback != ctrl.singleton.Status.StateRollback
+		}
+		if statusUpdated() {
+			instance.Status = ctrl.singleton.Status
+
 			err = r.client.Status().Update(context.TODO(), instance)
 			if err != nil {
 				log.Error(err, "Failed to update ClusterPolicy status")
@@ -131,7 +135,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 			return reconcile.Result{RequeueAfter: time.Second * 5}, statusError
 		}
 
-		if status == gpuv1.NotReady {
+		if status == gpuv1.NotReady && ctrl.singleton.Status.StateRollback == -1 {
 			// If the resource is not ready, wait 5 secs and reconcile
 			log.Info("ClusterPolicy step wasn't ready", "State:", status)
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
@@ -140,6 +144,16 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		if ctrl.last() {
 			break
 		}
+		if ctrl.singleton.Status.StateRollback != -1 {
+			if ctrl.singleton.Status.StateRollback == ctrl.idx - 1 {
+				ctrl.singleton.Status.StateRollback += 1
+			}
+		}
+	}
+
+	if ctrl.singleton.Status.StateRollback != -1 {
+		// rollback is finished, reconcile to activate the states
+		return reconcile.Result{RequeueAfter: time.Second * 1}, nil
 	}
 
 	instance.SetState(gpuv1.Ready)

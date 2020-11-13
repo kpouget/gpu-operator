@@ -34,8 +34,8 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
         name: nvidia-mig-mode-ctr
-        command: ["bash", "-c"]
-        args: ['echo "MIG Strategy: $DRV_MIG_STRATEGY"; echo "MIG Mode: $DRV_MIG_MODE"; sleep inf']
+        command: ["bash", "-x", "-c"]
+        args: ['nvidia-smi mig -dci ; nvidia-smi mig -dgi ; nvidia-smi mig -cgi $DRV_MIG_MODE -cgi 1 &&  nvidia-smi mig -cci && nvidia-smi -L && sleep inf']
         securityContext:
           privileged: true
           seLinuxOptions:

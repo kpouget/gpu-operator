@@ -26,6 +26,10 @@ func ServiceAccount(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ServiceAccount.DeepCopy()
 	logger := log.WithValues("ServiceAccount", obj.Name, "Namespace", obj.Namespace)
 
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -47,6 +51,10 @@ func Role(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Role.DeepCopy()
 	logger := log.WithValues("Role", obj.Name, "Namespace", obj.Namespace)
+
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -70,6 +78,10 @@ func RoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].RoleBinding.DeepCopy()
 	logger := log.WithValues("RoleBinding", obj.Name, "Namespace", obj.Namespace)
 
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -91,6 +103,10 @@ func ClusterRole(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ClusterRole.DeepCopy()
 	logger := log.WithValues("ClusterRole", obj.Name, "Namespace", obj.Namespace)
+
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -114,6 +130,10 @@ func ClusterRoleBinding(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].ClusterRoleBinding.DeepCopy()
 	logger := log.WithValues("ClusterRoleBinding", obj.Name, "Namespace", obj.Namespace)
 
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -135,6 +155,10 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ConfigMap.DeepCopy()
 	logger := log.WithValues("ConfigMap", obj.Name, "Namespace", obj.Namespace)
+
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -706,6 +730,10 @@ func Deployment(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Deployment.DeepCopy()
 
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
 	logger := log.WithValues("Deployment", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
@@ -729,6 +757,28 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].DaemonSet.DeepCopy()
 
+	if n.singleton.Status.StateRollback == state {
+		log.Info("DEBUG: ROLLBACK, Delete", "DaemonSet", obj.ObjectMeta.Name)
+		return deleteDaemonSet(n, obj)
+	} else if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
+	if obj.Name == "nvidia-device-plugin-daemonset" {
+		if n.singleton.Status.MigStrategy != "" && n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy {
+			// the mig strategy changed, rollback the following states
+			n.singleton.Status.StateRollback = state
+
+			n.singleton.Status.MigStrategy = ""
+			return deleteDaemonSet(n, obj)
+		} else {
+			n.singleton.Status.MigStrategy = n.singleton.Spec.GroupFeatureDiscovery.MigStrategy
+			if n.singleton.Status.MigStrategy == "" {
+				n.singleton.Status.MigStrategy = "none"
+			}
+		}
+	}
+
 	preProcessDaemonSet(obj, n)
 	logger := log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
@@ -747,6 +797,17 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	return isDaemonSetReady(obj.Name, n), nil
+}
+
+func deleteDaemonSet(n ClusterPolicyController, obj *appsv1.DaemonSet) (gpuv1.State, error) {
+	err := n.rec.client.Delete(context.TODO(), obj);
+
+	if errors.IsNotFound(err) {
+		// not an error, ignore
+		err = nil
+	}
+
+	return gpuv1.Ready, err
 }
 
 // The operator starts two pods in different stages to validate
@@ -781,7 +842,16 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
 
-	preProcessPod(obj, n)
+	if n.singleton.Status.StateRollback == state {
+		log.Info("DEBUG: Delete", "Pod", obj.ObjectMeta.Name)
+		return deletePod(n, obj)
+	} else if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
+	if err := preProcessPod(obj, n); err != nil {
+		return gpuv1.NotReady, err
+	}
 	logger := log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
@@ -801,7 +871,18 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	return isPodReady(obj.Name, n, "Succeeded"), nil
 }
 
-func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
+func deletePod(n ClusterPolicyController, obj *corev1.Pod) (gpuv1.State, error) {
+	err := n.rec.client.Delete(context.TODO(), obj);
+
+	if errors.IsNotFound(err) {
+		// not an error, ignore
+		err = nil
+	}
+
+	return gpuv1.Ready, err
+}
+
+func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
 	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
 		"nvidia-driver-validation":        TransformValidator,
 		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
@@ -810,20 +891,25 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) {
 	t, ok := transformations[obj.Name]
 	if !ok {
 		log.Info(fmt.Sprintf("No transformation for Pod '%s'", obj.Name))
-		return
+		return nil
 	}
 
 	err := t(obj, &n.singleton.Spec, n)
 	if err != nil {
-		log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
-		os.Exit(1)
+		return fmt.Errorf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err)
 	}
+
+	return nil
 }
 
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].SecurityContextConstraints.DeepCopy()
 	logger := log.WithValues("SecurityContextConstraints", obj.Name, "Namespace", "default")
+
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
@@ -847,6 +933,10 @@ func Service(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].Service.DeepCopy()
 	logger := log.WithValues("Service", obj.Name, "Namespace", obj.Namespace)
 
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
+
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
 	}
@@ -868,6 +958,10 @@ func ServiceMonitor(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].ServiceMonitor.DeepCopy()
 	logger := log.WithValues("ServiceMonitor", obj.Name, "Namespace", obj.Namespace)
+
+	if n.singleton.Status.StateRollback  != -1 {
+		return gpuv1.Ready, nil
+	}
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
 		return gpuv1.NotReady, err
