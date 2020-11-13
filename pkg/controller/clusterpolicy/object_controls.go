@@ -772,10 +772,13 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if obj.Name == "nvidia-device-plugin-daemonset" {
 		if n.singleton.Status.MigStrategy != "" && n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy {
+			log.Info("DEBUG: ROLLBACK", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
 			// the mig strategy changed, rollback the following states
 			n.singleton.Status.StateRollback = state
+			log.Info("DEBUG: ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
 
 			n.singleton.Status.MigStrategy = ""
+			log.Info("DEBUG: ROLLBACK", "delete", obj.ObjectMeta.Name)
 			return deleteDaemonSet(n, obj)
 		} else {
 			n.singleton.Status.MigStrategy = n.singleton.Spec.GroupFeatureDiscovery.MigStrategy

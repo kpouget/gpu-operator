@@ -110,8 +110,19 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		return reconcile.Result{}, err
 	}
 
+
+
+	log.Info("START",
+		"StateRollback", ctrl.singleton.Status.StateRollback,
+		"MigMode", ctrl.singleton.Status.MigMode,
+		"MigStrategy", instance.Status.MigStrategy)
+
 	for {
+		log.Info("-------------- START STEP ")
+
 		status, statusError := ctrl.step()
+		log.Info("-------------- STEP DONE", "status", status, "statusError", statusError)
+
 		// Update the CR status
 		instance = &gpuv1.ClusterPolicy{}
 		err := r.client.Get(context.TODO(), request.NamespacedName, instance)
@@ -138,24 +149,31 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		if status == gpuv1.NotReady && ctrl.singleton.Status.StateRollback == -1 {
 			// If the resource is not ready, wait 5 secs and reconcile
 			log.Info("ClusterPolicy step wasn't ready", "State:", status)
+			log.Info("-x-\n\n")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		if ctrl.last() {
+			log.Info("============== BREAK STEPS")
 			break
 		}
 		if ctrl.singleton.Status.StateRollback != -1 {
 			if ctrl.singleton.Status.StateRollback == ctrl.idx - 1 {
 				ctrl.singleton.Status.StateRollback += 1
+				log.Info("DEBUG: ROLLBACK", "new StateRollback", ctrl.singleton.Status.StateRollback)
 			}
 		}
+		log.Info("============== END STEP")
 	}
 
 	if ctrl.singleton.Status.StateRollback != -1 {
 		// rollback is finished, reconcile to activate the states
+		log.Info("DEBUG: ROLLBACK finished", "StateRollback", ctrl.singleton.Status.StateRollback)
+
 		return reconcile.Result{RequeueAfter: time.Second * 1}, nil
 	}
 
 	instance.SetState(gpuv1.Ready)
+
 	return reconcile.Result{}, nil
 }
