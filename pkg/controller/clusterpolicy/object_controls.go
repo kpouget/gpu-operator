@@ -206,7 +206,7 @@ func kernelFullVersion(n ClusterPolicyController) (string, string, string) {
 	var ok bool
 	kFVersion, ok := labels["feature.node.kubernetes.io/kernel-version.full"]
 	if ok {
-		logger.Info(kFVersion)
+		//logger.Info(kFVersion)
 	} else {
 		err := errors.NewNotFound(schema.GroupResource{Group: "Node", Resource: "Label"},
 			"feature.node.kubernetes.io/kernel-version.full")
@@ -507,6 +507,7 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
+	log.Info(fmt.Sprintf("===>: %s", obj.Spec.Template.Spec.Containers[0].Args))
 	var migStrategy gpuv1.MigStrategy = config.GroupFeatureDiscovery.MigStrategy
 	if migStrategy != "" {
 		addContainerArg(&(obj.Spec.Template.Spec.Containers[0]), "-mig-strategy")
@@ -601,7 +602,7 @@ func setContainerEnv(c *corev1.Container, key, value string) {
 		return
 	}
 
-	log.Info(fmt.Sprintf("Info: Could not find environment variable %s in container %s, appending it", key, c.Name))
+	//log.Info(fmt.Sprintf("Info: Could not find environment variable %s in container %s, appending it", key, c.Name))
 	c.Env = append(c.Env, corev1.EnvVar{Name: key, Value: value})
 }
 
@@ -686,19 +687,19 @@ func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
-	log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
+	//log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DeploymentList{}
 	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		log.Info("Could not get DaemonSetList", err)
 	}
-	log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
+	//log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.UnavailableReplicas)
+	//log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.UnavailableReplicas)
 
 	if ds.Status.UnavailableReplicas != 0 {
 		return gpuv1.NotReady
@@ -711,19 +712,19 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	opts := []client.ListOption{
 		client.MatchingLabels{"app": name},
 	}
-	log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
+	//log.Info("DEBUG: DaemonSet", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &appsv1.DaemonSetList{}
 	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		log.Info("Could not get DaemonSetList", err)
 	}
-	log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
+	//log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
+	//log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
 
 	if ds.Status.NumberUnavailable != 0 {
 		return gpuv1.NotReady
@@ -826,13 +827,13 @@ func deleteDaemonSet(n ClusterPolicyController, obj *appsv1.DaemonSet) (gpuv1.St
 func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) gpuv1.State {
 	opts := []client.ListOption{&client.MatchingLabels{"app": name}}
 
-	log.Info("DEBUG: Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
+	//log.Info("DEBUG: Pod", "LabelSelector", fmt.Sprintf("app=%s", name))
 	list := &corev1.PodList{}
 	err := n.rec.client.List(context.TODO(), list, opts...)
 	if err != nil {
 		log.Info("Could not get PodList", err)
 	}
-	log.Info("DEBUG: Pod", "NumberOfPods", len(list.Items))
+	//log.Info("DEBUG: Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
 		return gpuv1.NotReady
 	}
@@ -843,7 +844,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 		log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "!=", phase)
 		return gpuv1.NotReady
 	}
-	log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "==", phase)
+	//log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "==", phase)
 	return gpuv1.Ready
 }
 
