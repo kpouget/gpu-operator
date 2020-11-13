@@ -162,16 +162,18 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 		return err
 	}
 
-	addState(n, "/opt/gpu-operator/state-driver")
-	addState(n, "/opt/gpu-operator/state-container-toolkit")
-	addState(n, "/opt/gpu-operator/state-driver-validation")
-	addState(n, "/opt/gpu-operator/state-device-plugin")
-	addState(n, "/opt/gpu-operator/state-mig-mode")
-	addState(n, "/opt/gpu-operator/state-device-plugin-validation")
-	addState(n, "/opt/gpu-operator/state-monitoring")
-	// if requested, deploy GFD to utilitize Multi-Instance GPU's.
-	if i.Spec.Operator.DeployGFD {
-		addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+	if len(n.controls) == 0 {
+		addState(n, "/opt/gpu-operator/state-driver")
+		addState(n, "/opt/gpu-operator/state-container-toolkit")
+		addState(n, "/opt/gpu-operator/state-mig-mode")
+		addState(n, "/opt/gpu-operator/state-driver-validation")
+		addState(n, "/opt/gpu-operator/state-device-plugin")
+		addState(n, "/opt/gpu-operator/state-device-plugin-validation")
+		addState(n, "/opt/gpu-operator/state-monitoring")
+		// if requested, deploy GFD to utilitize Multi-Instance GPU's.
+		if i.Spec.Operator.DeployGFD {
+			addState(n, "/opt/gpu-operator/gpu-feature-discovery")
+		}
 	}
 
 	if n.singleton.Status.StateRollback >= len(n.controls) - 1 {
