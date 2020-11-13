@@ -414,8 +414,14 @@ func TransformMigMode(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 		return err
 	}
 
-	migStrategy := corev1.EnvVar{Name: "DRV_MIG_STRATEGY", Value: "mixed"}
-	migMode := corev1.EnvVar{Name: "DRV_MIG_MODE", Value: "19,19,19,19"}
+	migStrategy := corev1.EnvVar{
+		Name: "DRV_MIG_STRATEGY",
+		Value: string(n.singleton.Spec.GroupFeatureDiscovery.MigStrategy),
+	}
+	migMode := corev1.EnvVar{
+		Name: "DRV_MIG_MODE",
+		Value: n.singleton.Spec.Driver.MigMode,
+	}
 
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, migStrategy)
 	obj.Spec.Template.Spec.Containers[0].Env = append(obj.Spec.Template.Spec.Containers[0].Env, migMode)
