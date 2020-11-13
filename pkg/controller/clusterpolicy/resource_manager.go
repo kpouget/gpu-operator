@@ -67,7 +67,9 @@ func getAssetsFrom(path, openshiftVersion string) []assetsFromFile {
 		if strings.Contains(file, "openshift") && openshiftVersion == "" {
 			continue
 		}
-
+		if strings.HasPrefix(file, ".") {
+			continue
+		}
 		buffer, err := ioutil.ReadFile(file)
 		if err != nil {
 			panic(err)
