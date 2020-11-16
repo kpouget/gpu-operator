@@ -254,7 +254,7 @@ func preProcessDaemonSet(obj *appsv1.DaemonSet, n ClusterPolicyController) {
 
 	err := t(obj, &n.singleton.Spec, n)
 	if err != nil {
-		log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
+		log.Info(fmt.Sprintf("FATAL: Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
 		os.Exit(1)
 	}
 }
@@ -611,13 +611,13 @@ func addContainerArg(c *corev1.Container, val string) {
 	log.Info(fmt.Sprintf("Info: adding Pod argument '%s'", val))
 }
 
-func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
-	if err := TransformValidator(obj, config, n); err != nil {
-		return err
+func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) (gpuv1.State, error) {
+	if state, err := TransformValidator(obj, config, n); err != nil {
+		return state, err
 	}
 
 	if config.GroupFeatureDiscovery.MigStrategy != "mixed" {
-		return nil
+		return gpuv1.Ready, nil
 	}
 
 	opts := []client.ListOption{
@@ -632,7 +632,7 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 	}
 	log.Info("DEBUG: Node", "NumberOfNodes", len(list.Items))
 	if len(list.Items) == 0 {
-		return fmt.Errorf("ERROR: Could not find any node with label 'nvidia.com/gpu.present=true'")
+		return gpuv1.Ready, fmt.Errorf("ERROR: Could not find any node with label 'nvidia.com/gpu.present=true'")
 	}
 
 	node := list.Items[0]
@@ -650,7 +650,7 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 	}
 
 	if mig_resource_name == "" {
-		return fmt.Errorf("ERROR: Could not find any 'nvidia.com/mig-*' resource in node/%s",
+		return gpuv1.NotReady, fmt.Errorf("ERROR: Could not find any 'nvidia.com/mig-*' resource in node/%s",
 			              node.ObjectMeta.Name)
 	}
 
@@ -661,11 +661,11 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 	obj.Spec.Containers[0].Resources.Limits = mig_resource
 	obj.Spec.Containers[0].Resources.Requests = mig_resource
 
-	return nil
+	return gpuv1.Ready, nil
 }
 
 // TransformValidator transforms driver and device plugin validator pods with required config as per ClusterPolicy
-func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
+func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) (gpuv1.State, error) {
 	// update image
 	if config.Operator.Validator.Repository != "" {
 		obj.Spec.Containers[0].Image = config.Operator.Validator.ImagePath()
@@ -680,7 +680,7 @@ func TransformValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterP
 			obj.Spec.ImagePullSecrets = append(obj.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
 		}
 	}
-	return nil
+	return gpuv1.Ready, nil
 }
 
 func isDeploymentReady(name string, n ClusterPolicyController) gpuv1.State {
@@ -861,8 +861,8 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	if err := preProcessPod(obj, n); err != nil {
-		return gpuv1.NotReady, err
+	if state, err := preProcessPod(obj, n); err != nil {
+		return state, err
 	}
 	logger := log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
 
@@ -896,8 +896,8 @@ func deletePod(n ClusterPolicyController, obj *corev1.Pod) (gpuv1.State, error) 
 	return gpuv1.Ready, err
 }
 
-func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
-	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController) error{
+func preProcessPod(obj *v1.Pod, n ClusterPolicyController) (gpuv1.State, error) {
+	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController)  (gpuv1.State, error) {
 		"nvidia-driver-validation":        TransformValidator,
 		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
 	}
@@ -905,15 +905,22 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) error {
 	t, ok := transformations[obj.Name]
 	if !ok {
 		log.Info(fmt.Sprintf("No transformation for Pod '%s'", obj.Name))
-		return nil
+		return gpuv1.Ready, nil
 	}
 
-	err := t(obj, &n.singleton.Spec, n)
+	state, err := t(obj, &n.singleton.Spec, n)
 	if err != nil {
-		return fmt.Errorf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err)
+		if state == gpuv1.NotReady {
+			log.Info(fmt.Sprintf("Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
+			return gpuv1.NotReady, nil
+		}
+
+		// permanent failure ...
+		log.Info(fmt.Sprintf("FATAL: Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
+		os.Exit(1)
 	}
 
-	return nil
+	return gpuv1.Ready, nil
 }
 
 func SecurityContextConstraints(n ClusterPolicyController) (gpuv1.State, error) {
