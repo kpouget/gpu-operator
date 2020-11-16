@@ -765,21 +765,22 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	obj := n.resources[state].DaemonSet.DeepCopy()
 
 	if n.singleton.Status.StateRollback == state {
-		log.Info("DEBUG: ROLLBACK, Delete", "DaemonSet", obj.ObjectMeta.Name)
+
 		return deleteDaemonSet(n, obj)
 	} else if n.singleton.Status.StateRollback  != -1 {
 		return gpuv1.Ready, nil
 	}
 
+	log.Info("STEP ----->", "name", obj.Name)
 	if obj.Name == "nvidia-device-plugin-daemonset" {
 		if n.singleton.Status.MigStrategy != "" && n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy {
-			log.Info("DEBUG: ROLLBACK", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
+			log.Info("ROLLBACK strategy-trigger", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
 			// the mig strategy changed, rollback the following states
 			n.singleton.Status.StateRollback = state
-			log.Info("DEBUG: ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
+			log.Info("ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
 
 			n.singleton.Status.MigStrategy = ""
-			log.Info("DEBUG: ROLLBACK", "delete", obj.ObjectMeta.Name)
+
 			return deleteDaemonSet(n, obj)
 		} else {
 			n.singleton.Status.MigStrategy = n.singleton.Spec.GroupFeatureDiscovery.MigStrategy
@@ -810,6 +811,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func deleteDaemonSet(n ClusterPolicyController, obj *appsv1.DaemonSet) (gpuv1.State, error) {
+	log.Info("DEBUG: ROLLBACK, Delete", "DaemonSet", obj.ObjectMeta.Name)
 	err := n.rec.client.Delete(context.TODO(), obj);
 
 	if errors.IsNotFound(err) {
@@ -851,9 +853,9 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
+	log.Info("STEP ----->", "name", obj.Name)
 
 	if n.singleton.Status.StateRollback == state {
-		log.Info("DEBUG: Delete", "Pod", obj.ObjectMeta.Name)
 		return deletePod(n, obj)
 	} else if n.singleton.Status.StateRollback  != -1 {
 		return gpuv1.Ready, nil
@@ -882,6 +884,8 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 }
 
 func deletePod(n ClusterPolicyController, obj *corev1.Pod) (gpuv1.State, error) {
+	log.Info("DEBUG: Delete", "Pod", obj.ObjectMeta.Name)
+
 	err := n.rec.client.Delete(context.TODO(), obj);
 
 	if errors.IsNotFound(err) {
