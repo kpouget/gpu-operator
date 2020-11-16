@@ -790,6 +790,23 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		}
 	}
 
+	if obj.Name == "nvidia-mig-mode-daemonset" {
+		if n.singleton.Status.MigMode != "" && n.singleton.Status.MigMode != n.singleton.Spec.Driver.MigMode {
+			log.Info("ROLLBACK mode-trigger", "old", n.singleton.Status.MigMode, "new", n.singleton.Spec.Driver.MigMode)
+			// the mig mode changed, rollback the following states
+			n.singleton.Status.StateRollback = state
+			log.Info("ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
+			n.singleton.Status.MigMode = ""
+
+			return deleteDaemonSet(n, obj)
+		} else {
+			n.singleton.Status.MigMode = n.singleton.Spec.Driver.MigMode
+			if n.singleton.Status.MigMode == "" {
+				n.singleton.Status.MigMode = "none"
+			}
+		}
+	}
+
 	preProcessDaemonSet(obj, n)
 	logger := log.WithValues("DaemonSet", obj.Name, "Namespace", obj.Namespace)
 
