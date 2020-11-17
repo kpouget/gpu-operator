@@ -642,12 +642,14 @@ func TransformDevicePluginValidator(obj *v1.Pod, config *gpuv1.ClusterPolicySpec
 
 	var mig_resource_name corev1.ResourceName = ""
 
-	for resource_name, quantity := range node.Status.Capacity {
+	for resource_name, quantity := range node.Status.Allocatable {
 		if quantity.Value() < 1 || ! strings.HasPrefix(string(resource_name), "nvidia.com/mig-") {
 			continue
 		}
 
 		mig_resource_name = resource_name
+
+		log.Info("DEBUG: Found", "mig_resource_name", mig_resource_name, "quantity", quantity)
 		break
 	}
 
