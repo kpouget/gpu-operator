@@ -165,7 +165,7 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	if len(n.controls) == 0 {
 		addState(n, "/opt/gpu-operator/state-driver")
 		addState(n, "/opt/gpu-operator/state-container-toolkit")
-		addState(n, "/opt/gpu-operator/state-mig-mode")
+		addState(n, "/opt/gpu-operator/state-mig-mode-pod")
 		addState(n, "/opt/gpu-operator/state-driver-validation")
 		addState(n, "/opt/gpu-operator/state-device-plugin")
 		addState(n, "/opt/gpu-operator/state-device-plugin-validation")

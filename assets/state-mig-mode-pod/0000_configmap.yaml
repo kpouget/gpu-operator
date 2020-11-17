@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-mig-mode-run-sh
+  namespace: gpu-operator-resources
+data:
+  run.sh : |
+    #! /bin/bash
+
+    set -e
+
+    CURRENT_MIG_MODE=$(nvidia-smi --query-gpu=mig.mode.current --format=csv,noheader)
+
+    set_mig_mode() {
+      mode=$1
+
+      if [ "$CURRENT_MIG_MODE" != "$mode" ]; then
+        nvidia-smi -mig "${mode^^}"
+        nvidia-smi --gpu-reset
+
+        new_mig_mode=$(nvidia-smi --query-gpu=mig.mode.current --format=csv,noheader)
+        if [ "$new_mig_mode" != "$mode" ]; then
+           pending_mig_mode=$(nvidia-smi --query-gpu=mig.mode.pending --format=csv,noheader)
+           echo "INFO: pending mig mode: '$pending_mig_mode'"
+           echo "ERROR: Failed to change MIG mode, please reboot the node manually."
+           return 1
+         fi
+      fi
+    }
+
+    if [ "$DRV_MIG_STRATEGY" == "none" ]; then
+      set_mig_mode Disabled || exit 1
+
+    else
+      # DRV_MIG_STRATEGY: mixed or single
+
+      set_mig_mode Enabled || exit 1
+
+      nvidia-smi mig -dci || true
+      nvidia-smi mig -dgi || true
+
+      nvidia-smi mig -cgi "$DRV_MIG_MODE" -cgi 1
+      nvidia-smi mig -cci
+    fi
+
+    nvidia-smi -L
+    echo Done

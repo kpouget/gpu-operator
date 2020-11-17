@@ -432,6 +432,19 @@ func TransformMigMode(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n 
 	return nil
 }
 
+func TransformMigModePod(obj *v1.Pod, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) (gpuv1.State, error) {
+	objDaemonSet := appsv1.DaemonSet{}
+
+	objDaemonSet.Spec.Template.ObjectMeta = obj.ObjectMeta
+	objDaemonSet.Spec.Template.Spec = obj.Spec
+
+	err := TransformMigMode(&objDaemonSet, config, n)
+
+	objDaemonSet.Spec.Template.ObjectMeta = obj.ObjectMeta
+	objDaemonSet.Spec.Template.Spec = obj.Spec
+	return gpuv1.Ready, err
+}
+
 // TransformToolkit transforms Nvidia container-toolkit daemonset with required config as per ClusterPolicy
 func TransformToolkit(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpec, n ClusterPolicyController) error {
 	obj.Spec.Template.Spec.Containers[0].Image = config.Toolkit.ImagePath()
@@ -796,7 +809,19 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 	}
 
 	if obj.Name == "nvidia-mig-mode-daemonset" {
-		if n.singleton.Status.MigMode != "" && n.singleton.Status.MigMode != n.singleton.Spec.Driver.MigMode {
+		if n.singleton.Status.MigStrategy != "" &&
+			n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy &&
+			(n.singleton.Status.MigStrategy == "none" ||
+				n.singleton.Spec.GroupFeatureDiscovery.MigStrategy == "none") {
+			log.Info("ROLLBACK strategy-trigger", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
+			log.Info("ROLLBACK mode status", "old", n.singleton.Status.MigMode, "new", n.singleton.Spec.Driver.MigMode)
+
+			n.singleton.Status.StateRollback = state
+			log.Info("ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
+			n.singleton.Status.MigMode = ""
+			n.singleton.Status.MigStrategy = ""
+
+		} else if n.singleton.Status.MigMode != "" && n.singleton.Status.MigMode != n.singleton.Spec.Driver.MigMode {
 			log.Info("ROLLBACK mode-trigger", "old", n.singleton.Status.MigMode, "new", n.singleton.Spec.Driver.MigMode)
 			// the mig mode changed, rollback the following states
 			n.singleton.Status.StateRollback = state
@@ -891,9 +916,39 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	if state, err := preProcessPod(obj, n); err != nil {
+	if obj.Name == "nvidia-mig-mode-pod" {
+		if n.singleton.Status.MigStrategy != "" &&
+			n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy &&
+			(n.singleton.Status.MigStrategy == "none" ||
+				n.singleton.Spec.GroupFeatureDiscovery.MigStrategy == "none") {
+			log.Info("ROLLBACK strategy-trigger", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
+			log.Info("ROLLBACK mode status", "old", n.singleton.Status.MigMode, "new", n.singleton.Spec.Driver.MigMode)
+
+			n.singleton.Status.StateRollback = state
+			log.Info("ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
+			n.singleton.Status.MigMode = ""
+			n.singleton.Status.MigStrategy = ""
+
+		} else if n.singleton.Status.MigMode != "" && n.singleton.Status.MigMode != n.singleton.Spec.Driver.MigMode {
+			log.Info("ROLLBACK mode-trigger", "old", n.singleton.Status.MigMode, "new", n.singleton.Spec.Driver.MigMode)
+			// the mig mode changed, rollback the following states
+			n.singleton.Status.StateRollback = state
+			log.Info("ROLLBACK start", "StateRollback", ctrl.singleton.Status.StateRollback)
+			n.singleton.Status.MigMode = ""
+
+			return deletePod(n, obj)
+		} else {
+			n.singleton.Status.MigMode = n.singleton.Spec.Driver.MigMode
+			if n.singleton.Status.MigMode == "" {
+				n.singleton.Status.MigMode = "none"
+			}
+		}
+	}
+
+	if state, err := preProcessPod(obj, n); err != nil || state != gpuv1.Ready {
 		return state, err
 	}
+
 	logger := log.WithValues("Pod", obj.Name, "Namespace", obj.Namespace)
 
 	if err := controllerutil.SetControllerReference(n.singleton, obj, n.rec.scheme); err != nil {
@@ -931,6 +986,7 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) (gpuv1.State, error) 
 	transformations := map[string]func(*v1.Pod, *gpuv1.ClusterPolicySpec, ClusterPolicyController)  (gpuv1.State, error) {
 		"nvidia-driver-validation":        TransformValidator,
 		"nvidia-device-plugin-validation": TransformDevicePluginValidator,
+		"nvidia-mig-mode-pod":             TransformMigModePod,
 	}
 
 	t, ok := transformations[obj.Name]
@@ -949,6 +1005,10 @@ func preProcessPod(obj *v1.Pod, n ClusterPolicyController) (gpuv1.State, error) 
 		// permanent failure ...
 		log.Info(fmt.Sprintf("FATAL: Failed to apply transformation '%s' with error: '%v'", obj.Name, err))
 		os.Exit(1)
+	}
+
+	if obj.Name == "nvidia-device-plugin-validation" {
+		log.Info("Pod", "val", obj.Spec)
 	}
 
 	return gpuv1.Ready, nil
