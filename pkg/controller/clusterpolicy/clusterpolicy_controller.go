@@ -174,6 +174,11 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		log.Info("STEP next")
 	}
 
+	err = r.client.Status().Update(context.TODO(), instance)
+	if err != nil {
+		log.Info("WARNING: Failed to update ClusterPolicy status", "error", err)
+	}
+
 	if ctrl.singleton.Status.StateRollback != -1 {
 		// rollback is finished, reconcile to activate the states
 		log.Info("ROLLBACK finished", "StateRollback", ctrl.singleton.Status.StateRollback)
@@ -185,8 +190,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 	err = r.client.Status().Update(context.TODO(), instance)
 	if err != nil {
-		log.Error(err, "Failed to update ClusterPolicy status")
-		return reconcile.Result{RequeueAfter: time.Second * 5}, err
+		log.Info("WARNING: Failed to update ClusterPolicy status", "error", err)
 	}
 
 	return reconcile.Result{}, nil
