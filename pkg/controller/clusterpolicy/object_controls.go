@@ -164,6 +164,9 @@ func ConfigMap(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.NotReady, err
 	}
 
+	// delete to simplify dev-time modifications
+	n.rec.client.Delete(context.TODO(), obj)
+
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
 			//logger.Info("Found Resource")
