@@ -507,7 +507,6 @@ func TransformDevicePlugin(obj *appsv1.DaemonSet, config *gpuv1.ClusterPolicySpe
 		}
 	}
 
-	log.Info(fmt.Sprintf("===>: %s", obj.Spec.Template.Spec.Containers[0].Args))
 	var migStrategy gpuv1.MigStrategy = config.GroupFeatureDiscovery.MigStrategy
 	if migStrategy != "" {
 		addContainerArg(&(obj.Spec.Template.Spec.Containers[0]), "-mig-strategy")
@@ -718,15 +717,16 @@ func isDaemonSetReady(name string, n ClusterPolicyController) gpuv1.State {
 	if err != nil {
 		log.Info("Could not get DaemonSetList", err)
 	}
-	//log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
+
 	if len(list.Items) == 0 {
+		log.Info("DEBUG: DaemonSet", "NumberOfDaemonSets", len(list.Items))
 		return gpuv1.NotReady
 	}
 
 	ds := list.Items[0]
-	//log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
 
 	if ds.Status.NumberUnavailable != 0 {
+		log.Info("DEBUG: DaemonSet", "NumberUnavailable", ds.Status.NumberUnavailable)
 		return gpuv1.NotReady
 	}
 
@@ -771,7 +771,7 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 		return gpuv1.Ready, nil
 	}
 
-	log.Info("STEP ----->", "name", obj.Name)
+	log.Info("STEP start", "name", obj.Name)
 	if obj.Name == "nvidia-device-plugin-daemonset" {
 		if n.singleton.Status.MigStrategy != "" && n.singleton.Status.MigStrategy != n.singleton.Spec.GroupFeatureDiscovery.MigStrategy {
 			log.Info("ROLLBACK strategy-trigger", "old", n.singleton.Status.MigStrategy, "new", n.singleton.Spec.GroupFeatureDiscovery.MigStrategy)
@@ -816,25 +816,32 @@ func DaemonSet(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			//logger.Info("Found Resource")
+			logger.Info("Resource Already Exists")
 			return isDaemonSetReady(obj.Name, n), nil
 		}
 
 		logger.Info("Couldn't create", "Error", err)
 		return gpuv1.NotReady, err
 	}
+	logger.Info("Resource Created")
 
 	return isDaemonSetReady(obj.Name, n), nil
 }
 
 func deleteDaemonSet(n ClusterPolicyController, obj *appsv1.DaemonSet) (gpuv1.State, error) {
-	log.Info("DEBUG: ROLLBACK, Delete", "DaemonSet", obj.ObjectMeta.Name)
+	log.Info("ROLLBACK, Delete", "DaemonSet", obj.ObjectMeta.Name)
 	err := n.rec.client.Delete(context.TODO(), obj);
 
 	if errors.IsNotFound(err) {
+		log.Info("Info: Delete DaemonSet", "err", err)
+
 		// not an error, ignore
 		err = nil
+	} else {
+		log.Info("Warning: Delete DaemonSet", "err", err)
+
 	}
+
 
 	return gpuv1.Ready, err
 }
@@ -854,13 +861,14 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 	}
 	//log.Info("DEBUG: Pod", "NumberOfPods", len(list.Items))
 	if len(list.Items) == 0 {
+		log.Info("DEBUG: Pod not ready", "NumberOfPods", 0)
 		return gpuv1.NotReady
 	}
 
 	pd := list.Items[0]
 
 	if pd.Status.Phase != phase {
-		log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "!=", phase)
+		log.Info("DEBUG: Pod not ready", "Phase", pd.Status.Phase, "!=", phase)
 		return gpuv1.NotReady
 	}
 	//log.Info("DEBUG: Pod", "Phase", pd.Status.Phase, "==", phase)
@@ -870,7 +878,7 @@ func isPodReady(name string, n ClusterPolicyController, phase corev1.PodPhase) g
 func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 	state := n.idx
 	obj := n.resources[state].Pod.DeepCopy()
-	log.Info("STEP ----->", "name", obj.Name)
+	log.Info("STEP start", "name", obj.Name)
 
 	if n.singleton.Status.StateRollback == state {
 		return deletePod(n, obj)
@@ -889,13 +897,14 @@ func Pod(n ClusterPolicyController) (gpuv1.State, error) {
 
 	if err := n.rec.client.Create(context.TODO(), obj); err != nil {
 		if errors.IsAlreadyExists(err) {
-			//logger.Info("Found Resource")
+			logger.Info("Resource Already Exists")
 			return isPodReady(obj.Name, n, "Succeeded"), nil
 		}
 
 		logger.Info("Couldn't create", "Error", err)
 		return gpuv1.NotReady, err
 	}
+	logger.Info("Resource Created")
 
 	return isPodReady(obj.Name, n, "Succeeded"), nil
 }

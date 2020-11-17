@@ -112,17 +112,17 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 	//ctrl.singleton.Status.StateRollback = instance.Status.StateRollback
 
-	log.Info("START loop",
+	log.Info("START status",
 		"StateRollback", instance.Status.StateRollback,
 		"MigMode", instance.Status.MigMode,
 		"MigStrategy", instance.Status.MigStrategy)
 
 	for {
-		log.Info("STEP start", "step", ctrl.idx)
+		//log.Info("STEP start", "step", ctrl.idx)
 
 		stepStatus, statusError := ctrl.step()
 
-		log.Info("STEP stat", "stepStatus", stepStatus, "statusError", statusError)
+		//log.Info("STEP stat", "stepStatus", stepStatus, "statusError", statusError)
 
 		// Update the CR status
 		instance = &gpuv1.ClusterPolicy{}
@@ -140,7 +140,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 		if statusUpdated() {
 			instance.Status = ctrl.singleton.Status
-			log.Info("STEP do update")
+			//log.Info("STEP do update")
 			err = r.client.Status().Update(context.TODO(), instance)
 			if err != nil {
 				log.Error(err, "Failed to update ClusterPolicy status")
@@ -153,14 +153,14 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 		if stepStatus == gpuv1.NotReady && ctrl.singleton.Status.StateRollback == -1 {
 			// If the resource is not ready, wait 5 secs and reconcile
-			log.Info("ClusterPolicy step wasn't ready", "stepState:", stepStatus)
-			log.Info("-x-\n\n")
+			log.Info("ClusterPolicy step wasn't ready", "stepState:", stepStatus, "step", ctrl.idx-1)
+			log.Info("\n")
 			return reconcile.Result{RequeueAfter: time.Second * 5}, nil
 		}
 
 		if ctrl.last() {
 			log.Info("**************")
-			log.Info("BREAK STEPS", "step", ctrl.idx-1)
+			log.Info("STEP done", "step", ctrl.idx-1, "status", stepStatus)
 			log.Info("**************\n")
 			break
 		}
@@ -170,8 +170,8 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 				log.Info("ROLLBACK", "new StateRollback", ctrl.singleton.Status.StateRollback)
 			}
 		}
-		log.Info("STEP end", "step", ctrl.idx -1)
-		log.Info("--------")
+
+		log.Info("STEP next")
 	}
 
 	if ctrl.singleton.Status.StateRollback != -1 {

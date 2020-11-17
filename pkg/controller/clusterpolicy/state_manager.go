@@ -177,7 +177,7 @@ func (n *ClusterPolicyController) init(r *ReconcileClusterPolicy, i *gpuv1.Clust
 	}
 
 	if n.singleton.Status.StateRollback >= len(n.controls) - 1 {
-		log.Info(" ROLLBACK FINISHED :)")
+		log.Info("ROLLBACK FINISHED :)")
 		n.singleton.Status.StateRollback = -1
 		i.Status.StateRollback = -1
 	} else if n.singleton.Status.StateRollback != -1 {
