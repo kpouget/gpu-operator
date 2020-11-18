@@ -34,15 +34,33 @@ spec:
       - image: "FILLED BY THE OPERATOR"
         imagePullPolicy: Always
         name: nvidia-mig-mode-ctr
-        command: ["bash", "-x", "-c"]
-        args: ['nvidia-smi mig -dci ; nvidia-smi mig -dgi ; nvidia-smi mig -cgi $DRV_MIG_MODE -cgi 1 &&  nvidia-smi mig -cci && nvidia-smi -L && sleep inf']
+        command:
+          - bash
+          - /mnt/helpers/run.sh
         securityContext:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - bash
+              - /mnt/helpers/startup-hook.sh
+        volumeMounts:
+          - name: helpers
+            mountPath: /mnt/helpers
       volumes:
         - name: run-nvidia
           hostPath:
             path: /run/nvidia
+        - name: helpers
+          configMap:
+            name: nvidia-mig-mode
+            items:
+              - key: startup-hook.sh
+                path: startup-hook.sh
+              - key: run.sh
+                path: run.sh
       nodeSelector:
         nvidia.com/gpu.present: "true"

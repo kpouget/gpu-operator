@@ -27,22 +27,25 @@ spec:
     imagePullPolicy: Always
     name: nvidia-mig-mode-ctr
     command: ["bash", "-x", "/mnt/helper/run.sh"]
-
+    lifecycle:
+      postStart:
+        exec:
+          command:
+          - /mnt/helper/start-hook.sh
     securityContext:
       privileged: true
       seLinuxOptions:
         level: "s0"
     volumeMounts:
-    - mountPath: /mnt/helper/run.sh
+    - mountPath: /mnt/helper/
       name: run-sh
       readOnly: true
-      subPath: run.sh
   volumes:
   - name: run-nvidia
     hostPath:
       path: /run/nvidia
   - configMap:
-      defaultMode: 511
+      defaultMode: 0744
       name: nvidia-mig-mode-run-sh
     name: run-sh
   nodeSelector:

