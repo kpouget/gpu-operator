@@ -40,12 +40,22 @@ spec:
           privileged: true
           seLinuxOptions:
             level: "s0"
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - /mnt/probes/ready-probe.sh
+          initialDelaySeconds: 40
+          periodSeconds: 20
+
         volumeMounts:
           - name: run-nvidia
             mountPath: /run/nvidia
             mountPropagation: Bidirectional
           - name: config
             mountPath: /etc/containers/oci/hooks.d
+          - name: probes
+            mountPath: /mnt/probes
       volumes:
         - name: run-nvidia
           hostPath:
@@ -56,5 +66,11 @@ spec:
             items:
               - key: oci-nvidia-hook-json
                 path: oci-nvidia-hook.json
+        - name: probes
+          configMap:
+            name: nvidia-driver
+            items:
+              - key: ready-probe.sh
+                path: ready-probe.sh
       nodeSelector:
         nvidia.com/gpu.present: "true"

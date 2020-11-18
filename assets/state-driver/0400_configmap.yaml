@@ -20,3 +20,12 @@ data:
         },
         "stages": ["prestart"]
     }
+  ready-probe.sh : |
+    #! /bin/bash
+
+    MOD=nvidia
+
+    while ! lsmod | grep "$MOD" -q; do
+      echo "Module $MOD isn't loaded."
+      sleep 5
+    done
