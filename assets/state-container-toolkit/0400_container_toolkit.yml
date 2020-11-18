@@ -39,6 +39,19 @@ spec:
           value: ""
         imagePullPolicy: IfNotPresent
         name: nvidia-container-toolkit-ctr
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - bash
+              - /mnt/probes/startup-hook.sh
+        readinessProbe:
+          exec:
+            command:
+              - bash
+              - /mnt/probes/ready-probe.sh
+            initialDelaySeconds: 5
+            periodSeconds: 5
         securityContext:
           privileged: true
           seLinuxOptions:
@@ -55,6 +68,8 @@ spec:
             mountPath: /usr/local/nvidia
           - name: crio-hooks
             mountPath: /usr/share/containers/oci/hooks.d
+          - name: probes
+            mountPath: /mnt/probes
       volumes:
         - name: docker-socket
           hostPath:
@@ -71,5 +86,13 @@ spec:
         - name: crio-hooks
           hostPath:
             path: /etc/containers/oci/hooks.d
+        - name: probes
+          configMap:
+            name: nvidia-container-toolkit
+            items:
+            - key: startup-hook.sh
+              path: startup-hook.sh
+            - key: ready-probe.sh
+              path: ready-probe.sh
       nodeSelector:
         nvidia.com/gpu.present: "true"
