@@ -112,10 +112,13 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 	//ctrl.singleton.Status.StateRollback = instance.Status.StateRollback
 
+	log.Info("START config",
+		"MigMode", instance.Spec.Driver.MigMode,
+		"MigStrategy", instance.Spec.GroupFeatureDiscovery.MigStrategy)
 	log.Info("START status",
-		"StateRollback", instance.Status.StateRollback,
 		"MigMode", instance.Status.MigMode,
-		"MigStrategy", instance.Status.MigStrategy)
+		"MigStrategy", instance.Status.MigStrategy,
+		"StateRollback", instance.Status.StateRollback)
 
 	for {
 		//log.Info("STEP start", "step", ctrl.idx)
@@ -160,7 +163,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 
 		if ctrl.last() {
 			log.Info("**************")
-			log.Info("STEP done", "step", ctrl.idx-1, "status", stepStatus)
+			log.Info("STEP finished", "step", ctrl.idx-1, "status", stepStatus)
 			log.Info("**************\n")
 			break
 		}
@@ -171,7 +174,7 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 			}
 		}
 
-		log.Info("STEP next")
+		log.Info("STEP done")
 	}
 
 	err = r.client.Status().Update(context.TODO(), instance)
@@ -193,5 +196,6 @@ func (r *ReconcileClusterPolicy) Reconcile(request reconcile.Request) (reconcile
 		log.Info("WARNING: Failed to update ClusterPolicy status", "error", err)
 	}
 
+	log.Info("Ready :)")
 	return reconcile.Result{}, nil
 }
